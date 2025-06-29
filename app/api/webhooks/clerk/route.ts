@@ -9,11 +9,14 @@ const webhookSecret = process.env.CLERK_WEBHOOK_SECRET!;
 
 export async function POST(req: NextRequest) {
   const raw = await req.text();
-  const sig = req.headers.get("svix-signature")!;
+  const sig = req.headers.get("clerk-signature")!;
 
   let evt;
   try {
-    evt = new Webhook(webhookSecret).verify(raw, sig) as any;
+    evt = new Webhook(webhookSecret).verify(
+      raw,
+      { 'clerk-signature': sig }
+    ) as any;
   } catch (err) {
     console.error("⚠️ Webhook signature verification failed:", err);
     return new NextResponse("Invalid signature", { status: 400 });
