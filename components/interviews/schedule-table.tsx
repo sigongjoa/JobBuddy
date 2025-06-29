@@ -6,18 +6,20 @@ import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Interview } from "@/lib/types"
 
-interface Interview {
-  id: number;
-  company: string;
-  role: string;
-  applicationDate: string;
-  interviewDate: string;
-  type: string;
-  status: string;
-  nextAction: string;
-  feedback: string;
-}
+// 이 부분의 Interview 인터페이스는 제거됩니다.
+// interface Interview {
+//   id: number;
+//   company: string;
+//   role: string;
+//   applicationDate: string;
+//   interviewDate: string;
+//   type: string;
+//   status: string;
+//   nextAction: string;
+//   feedback: string;
+// }
 
 interface ScheduleTableProps {
   interviews: Interview[];
@@ -66,7 +68,7 @@ export function ScheduleTable({ interviews }: ScheduleTableProps) {
               </TableCell>
               <TableCell>
                 <Button variant="outline" size="sm">
-                  {interview.nextAction}
+                  {interview.nextAction ?? "—"}
                 </Button>
               </TableCell>
               <TableCell>

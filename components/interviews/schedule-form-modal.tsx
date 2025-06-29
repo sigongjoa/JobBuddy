@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { Interview } from "@/lib/types"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -20,16 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 interface ScheduleFormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAddInterview: (newInterview: {
-    company: string
-    role: string
-    applicationDate: string
-    interviewDate: string
-    interviewTime: string
-    type: string
-    status: string
-    notes: string
-  }) => void
+  onAddInterview: (newInterview: Omit<Interview, "id">) => void
 }
 
 export function ScheduleFormModal({ open, onOpenChange, onAddInterview }: ScheduleFormModalProps) {
@@ -46,7 +38,11 @@ export function ScheduleFormModal({ open, onOpenChange, onAddInterview }: Schedu
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onAddInterview(formData)
+    onAddInterview({
+      ...formData,
+      nextAction: "",
+      feedback: "",
+    })
     onOpenChange(false)
   }
 

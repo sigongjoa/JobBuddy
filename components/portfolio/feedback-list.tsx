@@ -23,13 +23,13 @@ interface Feedback {
 }
 
 interface FeedbackListProps {
-  // feedback: Feedback[] // Removed feedback prop, as it will manage its own state
+  feedback: Feedback[]; // feedback prop 추가
 }
 
-export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
+export function FeedbackList({ feedback }: FeedbackListProps) {
   console.debug("FeedbackList: function entry");
   const { userId, isLoaded, isSignedIn } = useAuth(); // Clerk 인증 훅 사용
-  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>(feedback); // prop으로 받은 feedback으로 초기화
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentFeedback, setCurrentFeedback] = useState<Feedback | null>(null);
   const [companies, setCompanies] = useState<string[]>([]); // State for company names
@@ -82,6 +82,7 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
         const plaintext = bytes.toString(CryptoJS.enc.Utf8);
         if (plaintext) {
           const parsedFeedbacks = JSON.parse(plaintext);
+          // props로 받은 feedback과 localStorage의 데이터를 병합하거나, localStorage 데이터 우선
           setFeedbacks(parsedFeedbacks);
           console.debug("FeedbackList: Feedbacks loaded and decrypted from localStorage", { parsedFeedbacks });
         } else {
@@ -96,8 +97,8 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
         alert("저장된 피드백 데이터를 복호화하는 데 실패했습니다. 데이터가 손상되었거나 잘못된 키일 수 있습니다. LocalStorage를 초기화합니다.");
       }
     } else {
-      setFeedbacks([]);
-      console.debug("FeedbackList: No saved feedbacks in localStorage.");
+      setFeedbacks(feedback); // localStorage에 없으면 prop으로 받은 feedback 사용
+      console.debug("FeedbackList: No saved feedbacks in localStorage, using prop data.");
     }
     console.debug("loadAndDecryptFeedbacks: function exit (FeedbackList)");
   };
@@ -187,9 +188,11 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
     if (loadedDecryptionKey) {
       loadAndDecryptFeedbacks();
       loadAndDecryptCompanies();
+    } else if (isLoaded && isSignedIn) { // 키가 없고 로그인 상태이면 (키 로드 실패 시)
+      setFeedbacks(feedback); // prop으로 받은 feedback을 사용하여 임시로 표시
     }
     console.debug("FeedbackList: useEffect exit (loadedDecryptionKey change)");
-  }, [loadedDecryptionKey]);
+  }, [loadedDecryptionKey, isLoaded, isSignedIn, feedback]); // feedback을 의존성 배열에 추가
 
   // feedbacks 데이터가 변경될 때마다 localStorage에 암호화하여 저장
   useEffect(() => {
@@ -248,11 +251,7 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
       <Button onClick={() => {
         console.debug("FeedbackList: Add feedback button clicked");
         setIsModalOpen(true);
-        setCurrentFeedback(null); // Ensure no old data in form
-      }} disabled={!isSignedIn || !loadedDecryptionKey}>
-        <Plus className="mr-2 h-4 w-4" />
-        피드백 추가
-      </Button>
+      }}><Plus className="mr-2 h-4 w-4" /> 피드백 추가</Button>
 
       <div className="space-y-2">
         {!isLoaded ? (
@@ -345,52 +344,72 @@ interface FeedbackFormProps {
 
 function FeedbackForm({ initialData, onSubmit, isEditing, availableCompanies }: FeedbackFormProps) {
   console.debug("FeedbackForm: function entry", { initialData });
-  const [source, setSource] = useState(initialData?.source || "");
-  const [comment, setComment] = useState(initialData?.comment || "");
-  const [rating, setRating] = useState(initialData?.rating || 0);
-  const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]); // YYYY-MM-DD format
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(initialData?.companyName || null); // State for selected company
+  const [formData, setFormData] = useState<Omit<Feedback, 'id'>>(() => ({
+    source: initialData?.source || "",
+    comment: initialData?.comment || "",
+    rating: initialData?.rating || 0,
+    date: initialData?.date || new Date().toISOString().split('T')[0],
+    companyName: initialData?.companyName || undefined,
+  }));
   const [useCompanySelect, setUseCompanySelect] = useState<boolean>(!!initialData?.companyName); // State to toggle between text input and select
 
   useEffect(() => {
+    console.debug("FeedbackForm: useEffect initialData change", { initialData });
     if (initialData) {
-      setSource(initialData.source || "");
-      setComment(initialData.comment || "");
-      setRating(initialData.rating || 0);
-      setDate(initialData.date || new Date().toISOString().split('T')[0]);
-      setSelectedCompany(initialData.companyName || null);
+      setFormData({
+        source: initialData.source || "",
+        comment: initialData.comment || "",
+        rating: initialData.rating || 0,
+        date: initialData.date || new Date().toISOString().split('T')[0],
+        companyName: initialData.companyName || undefined,
+      });
       setUseCompanySelect(!!initialData.companyName);
     }
   }, [initialData]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.debug("FeedbackForm: handleSubmit entry");
+    console.debug("FeedbackForm: handleSubmit entry", { formData });
 
-    let finalSource = source;
-    let finalCompanyName: string | undefined = undefined;
+    let finalSource = formData.source;
+    let finalCompanyName: string | undefined = formData.companyName;
 
-    if (useCompanySelect && selectedCompany) {
-      finalSource = `회사: ${selectedCompany}`;
-      finalCompanyName = selectedCompany;
-    } else if (useCompanySelect && !selectedCompany) {
+    if (useCompanySelect && !formData.companyName) {
       alert("회사를 선택해주세요.");
-      console.debug("FeedbackForm: Company not selected");
+      console.debug("FeedbackForm: Company not selected when select is used.");
       return;
-    } else if (!source) {
+    } else if (!useCompanySelect && !formData.source) {
       alert("출처를 입력해주세요.");
-      console.debug("FeedbackForm: Source not entered");
+      console.debug("FeedbackForm: Source not entered when text input is used.");
       return;
     }
 
-    if (!comment || rating === 0) {
+    if (!formData.comment || formData.rating === 0) {
       alert("모든 필드를 채워주세요 (내용, 별점).");
-      console.debug("FeedbackForm: Validation failed");
+      console.debug("FeedbackForm: Validation failed: comment or rating missing.");
       return;
     }
 
-    onSubmit({ source: finalSource, comment, date, rating, companyName: finalCompanyName });
+    // 최종 source 값을 companyName이 있을 경우 '회사: [회사이름]' 형식으로 설정
+    if (formData.companyName && useCompanySelect) {
+      finalSource = `회사: ${formData.companyName}`;
+    } else if (useCompanySelect && !formData.companyName) {
+      // 이 경우는 이미 위에서 알림으로 처리되었지만, 혹시 모를 상황에 대비
+      finalSource = ""; 
+    }
+
+    onSubmit({ ...formData, source: finalSource, companyName: finalCompanyName });
     console.debug("FeedbackForm: handleSubmit exit");
+  };
+
+  const handleSourceInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.debug("FeedbackForm: handleSourceInputChange entry", { value: e.target.value });
+    setFormData(prev => ({ ...prev, source: e.target.value, companyName: undefined }));
+  };
+
+  const handleCompanySelectChange = (value: string) => {
+    console.debug("FeedbackForm: handleCompanySelectChange entry", { value });
+    setFormData(prev => ({ ...prev, source: `회사: ${value}`, companyName: value }));
   };
 
   return (
@@ -403,8 +422,7 @@ function FeedbackForm({ initialData, onSubmit, isEditing, availableCompanies }: 
             onClick={() => {
               console.debug("FeedbackForm: Toggle source input type button clicked");
               setUseCompanySelect(!useCompanySelect);
-              setSource(""); // Clear text source when switching to select
-              setSelectedCompany(null); // Clear selected company when switching to text
+              setFormData(prev => ({ ...prev, source: "", companyName: undefined })); // Clear source/companyName on toggle
             }}
             variant="outline"
             size="sm"
@@ -412,10 +430,7 @@ function FeedbackForm({ initialData, onSubmit, isEditing, availableCompanies }: 
             {useCompanySelect ? "직접 입력" : "회사 목록 선택"}
           </Button>
           {useCompanySelect ? (
-            <Select onValueChange={(value) => {
-                console.debug("FeedbackForm: Company selected", { value });
-                setSelectedCompany(value);
-            }} value={selectedCompany || ""}>
+            <Select value={formData.companyName || ""} onValueChange={handleCompanySelectChange}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="회사 선택" />
               </SelectTrigger>
@@ -431,11 +446,8 @@ function FeedbackForm({ initialData, onSubmit, isEditing, availableCompanies }: 
             <Input
               id="source"
               placeholder="예: 면접관 A, 동료 B"
-              value={source}
-              onChange={(e) => {
-                console.debug("FeedbackForm: Source input changed", { value: e.target.value });
-                setSource(e.target.value);
-              }}
+              value={formData.source}
+              onChange={handleSourceInputChange}
             />
           )}
         </div>
@@ -446,10 +458,10 @@ function FeedbackForm({ initialData, onSubmit, isEditing, availableCompanies }: 
         <Textarea
           id="comment"
           placeholder="피드백 내용을 입력하세요."
-          value={comment}
+          value={formData.comment}
           onChange={(e) => {
             console.debug("FeedbackForm: Comment input changed", { value: e.target.value });
-            setComment(e.target.value);
+            setFormData(prev => ({ ...prev, comment: e.target.value }));
           }}
           rows={4}
         />
@@ -460,10 +472,10 @@ function FeedbackForm({ initialData, onSubmit, isEditing, availableCompanies }: 
           {[1, 2, 3, 4, 5].map((star) => (
             <Star
               key={star}
-              className={`h-6 w-6 cursor-pointer ${rating >= star ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
+              className={`h-6 w-6 cursor-pointer ${formData.rating >= star ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
               onClick={() => {
                 console.debug("FeedbackForm: Rating star clicked", { star });
-                setRating(star);
+                setFormData(prev => ({ ...prev, rating: star }));
               }}
             />
           ))}
@@ -474,10 +486,10 @@ function FeedbackForm({ initialData, onSubmit, isEditing, availableCompanies }: 
         <Input
           id="date"
           type="date"
-          value={date}
+          value={formData.date}
           onChange={(e) => {
             console.debug("FeedbackForm: Date input changed", { value: e.target.value });
-            setDate(e.target.value);
+            setFormData(prev => ({ ...prev, date: e.target.value }));
           }}
         />
       </div>

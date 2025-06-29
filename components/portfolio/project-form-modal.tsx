@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -18,7 +17,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { X } from "lucide-react"
-import React from "react"
 
 interface ProjectFormModalProps {
   open: boolean
@@ -61,7 +59,8 @@ export function ProjectFormModal({ open, onOpenChange, initialData, onSubmit }: 
     lastUpdated: initialData?.lastUpdated || new Date().toISOString().split('T')[0],
   })
 
-  React.useEffect(() => {
+  useEffect(() => {
+    console.debug("ProjectFormModal: useEffect initialData change", { initialData });
     if (initialData) {
       setFormData({
         title: initialData.title || "",
@@ -99,7 +98,7 @@ export function ProjectFormModal({ open, onOpenChange, initialData, onSubmit }: 
     setFormData((prev) => ({
       ...prev,
       targetSkills: prev.targetSkills.includes(skill)
-        ? prev.targetSkills.filter((s) => s !== skill)
+        ? prev.targetSkills.filter((s: string) => s !== skill)
         : [...prev.targetSkills, skill],
     }))
   }
@@ -107,7 +106,7 @@ export function ProjectFormModal({ open, onOpenChange, initialData, onSubmit }: 
   const removeSkill = (skill: string) => {
     setFormData((prev) => ({
       ...prev,
-      targetSkills: prev.targetSkills.filter((s) => s !== skill),
+      targetSkills: prev.targetSkills.filter((s: string) => s !== skill),
     }))
   }
 
@@ -117,8 +116,8 @@ export function ProjectFormModal({ open, onOpenChange, initialData, onSubmit }: 
 
     const improvementsArray = formData.plannedImprovements
       .split('\n')
-      .filter(line => line.trim() !== '')
-      .map((line, index) => ({ id: Date.now() + index, task: line.trim(), completed: false }));
+      .filter((line: string) => line.trim() !== '')
+      .map((line: string, index: number) => ({ id: Date.now() + index, task: line.trim(), completed: false }));
 
     const techStackArray = typeof formData.techStack === 'string' 
       ? formData.techStack.split(',').map(s => s.trim()).filter(s => s !== '') 
@@ -213,7 +212,7 @@ export function ProjectFormModal({ open, onOpenChange, initialData, onSubmit }: 
             <Label>대상 스킬</Label>
             {formData.targetSkills.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-2">
-                {formData.targetSkills.map((skill) => (
+                {formData.targetSkills.map((skill: string) => (
                   <Badge key={skill} variant="outline" className="text-xs">
                     {skill}
                     <Button

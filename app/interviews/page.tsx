@@ -12,18 +12,7 @@ import { FilterBar } from "@/components/interviews/filter-bar"
 import { ScheduleFormModal } from "@/components/interviews/schedule-form-modal"
 import { useAuth } from "@clerk/nextjs"
 import CryptoJS from "crypto-js"
-
-interface Interview {
-  id: number;
-  company: string;
-  role: string;
-  applicationDate: string;
-  interviewDate: string;
-  type: string;
-  status: string;
-  nextAction: string;
-  feedback: string;
-}
+import { Interview } from "@/lib/types"
 
 export default function InterviewsPage() {
   console.debug("InterviewsPage: function entry");
