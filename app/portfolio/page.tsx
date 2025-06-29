@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic";
+
 import { useState, useEffect } from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -17,35 +19,39 @@ export default function PortfolioPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projects, setProjects] = useState<any[]>([]); // 프로젝트 데이터 상태
   const [currentProject, setCurrentProject] = useState<any | null>(null); // 현재 수정 중인 프로젝트
-  const [decryptionKey, setDecryptionKey] = useState<string | null>(null);
+  const [loadedDecryptionKey, setLoadedDecryptionKey] = useState<string | null>(null);
+  const [keyLoadingError, setKeyLoadingError] = useState<string | null>(null);
 
-  const fetchDecryptionKey = async () => {
-    console.debug("fetchDecryptionKey: function entry (PortfolioPage)");
+  const loadKey = async () => {
+    console.debug("loadKey: function entry (PortfolioPage)");
     if (!isSignedIn) {
-      console.warn("fetchDecryptionKey: Not signed in, cannot fetch key (PortfolioPage).");
-      setDecryptionKey(null);
+      console.warn("loadKey: Not signed in, cannot load key (PortfolioPage).");
+      setLoadedDecryptionKey(null);
+      setKeyLoadingError("로그인해야 복호화 키를 가져올 수 있습니다.");
       return;
     }
+    setKeyLoadingError(null); // Clear previous errors
     try {
-      const res = await fetch("/api/getKey");
+      const res = await fetch("/api/getDecryptionKey");
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(`키를 가져올 수 없습니다: ${errorData.error || res.statusText}`);
+        const text = await res.text();
+        throw new Error(text || `Error ${res.status}`);
       }
-      const data = await res.json();
-      setDecryptionKey(data.key);
-      console.debug("fetchDecryptionKey: Key fetched successfully (PortfolioPage).");
-    } catch (error) {
-      console.error("fetchDecryptionKey: Error fetching decryption key (PortfolioPage)", { error });
-      setDecryptionKey(null);
+      const { key } = await res.json();
+      setLoadedDecryptionKey(key);
+      console.debug("loadKey: Key fetched successfully (PortfolioPage).");
+    } catch (error: any) {
+      console.error("loadKey: Error fetching decryption key (PortfolioPage)", { error });
+      setLoadedDecryptionKey(null);
+      setKeyLoadingError(`복호화 키를 가져오는 데 실패했습니다: ${error.message}`);
       alert(`복호화 키를 가져오는 데 실패했습니다: ${error.message}`);
     }
-    console.debug("fetchDecryptionKey: function exit (PortfolioPage)");
+    console.debug("loadKey: function exit (PortfolioPage)");
   };
 
   const loadAndDecryptData = async () => {
     console.debug("loadAndDecryptData: function entry (PortfolioPage)");
-    if (!decryptionKey) {
+    if (!loadedDecryptionKey) {
       console.debug("loadAndDecryptData: Decryption key not available yet (PortfolioPage).");
       return;
     }
@@ -53,7 +59,7 @@ export default function PortfolioPage() {
     const savedProjects = localStorage.getItem("portfolioProjects");
     if (savedProjects) {
       try {
-        const bytes = CryptoJS.AES.decrypt(savedProjects, decryptionKey);
+        const bytes = CryptoJS.AES.decrypt(savedProjects, loadedDecryptionKey);
         const plaintext = bytes.toString(CryptoJS.enc.Utf8);
         if (plaintext) {
           const parsedProjects = JSON.parse(plaintext);
@@ -68,6 +74,7 @@ export default function PortfolioPage() {
         console.error("PortfolioPage: Error parsing or decrypting saved projects from localStorage", { error });
         localStorage.removeItem("portfolioProjects");
         setProjects([]);
+        alert("저장된 데이터를 복호화하는 데 실패했습니다. 데이터가 손상되었거나 잘못된 키일 수 있습니다. LocalStorage를 초기화합니다.");
       }
     } else {
       setProjects([]);
@@ -78,53 +85,59 @@ export default function PortfolioPage() {
 
   const saveAndEncryptData = (data: any[]) => {
     console.debug("saveAndEncryptData: function entry (PortfolioPage)", { data });
-    if (!decryptionKey) {
+    if (!loadedDecryptionKey) {
       console.warn("saveAndEncryptData: Decryption key not available, cannot encrypt data (PortfolioPage).");
       return;
     }
 
     try {
-      const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(data), decryptionKey).toString();
+      const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(data), loadedDecryptionKey).toString();
       localStorage.setItem("portfolioProjects", encryptedData);
       console.debug("PortfolioPage: Data encrypted and saved to localStorage.");
     } catch (error) {
       console.error("PortfolioPage: Error encrypting or saving data to localStorage (PortfolioPage)", { error });
+      alert("데이터 암호화 및 저장에 실패했습니다.");
     }
     console.debug("saveAndEncryptData: function exit (PortfolioPage)");
   };
 
   useEffect(() => {
     console.debug("PortfolioPage: useEffect entry (Clerk status check)", { isLoaded, isSignedIn });
-    if (isLoaded && isSignedIn) {
-      fetchDecryptionKey();
-    } else if (isLoaded && !isSignedIn) {
-      setProjects([]);
-      setCurrentProject(null);
-      setDecryptionKey(null);
-      localStorage.removeItem("portfolioProjects");
-      console.debug("PortfolioPage: User not signed in, data cleared.");
+    if (isLoaded) {
+      if (isSignedIn) {
+        loadKey();
+      } else {
+        setProjects([]);
+        setCurrentProject(null);
+        setLoadedDecryptionKey(null);
+        setKeyLoadingError(null); // Clear error when signed out
+        localStorage.removeItem("portfolioProjects");
+        console.debug("PortfolioPage: User not signed in, data cleared.");
+      }
     }
     console.debug("PortfolioPage: useEffect exit (Clerk status check)");
   }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
-    console.debug("PortfolioPage: useEffect entry (decryptionKey change)", { decryptionKey });
-    if (decryptionKey) {
+    console.debug("PortfolioPage: useEffect entry (loadedDecryptionKey change)", { loadedDecryptionKey });
+    if (loadedDecryptionKey) {
       loadAndDecryptData();
     }
-    console.debug("PortfolioPage: useEffect exit (decryptionKey change)");
-  }, [decryptionKey]);
+    console.debug("PortfolioPage: useEffect exit (loadedDecryptionKey change)");
+  }, [loadedDecryptionKey]);
 
   useEffect(() => {
     console.debug("PortfolioPage: useEffect entry (projects data change)", { projects });
-    if (projects.length > 0) {
+    // Save data only if projects.length > 0 AND decryptionKey is loaded AND user is signed in
+    if (projects.length > 0 && loadedDecryptionKey && isLoaded && isSignedIn) {
       saveAndEncryptData(projects);
-    } else if (isLoaded && isSignedIn && decryptionKey) {
-      localStorage.removeItem("portfolioProjects");
-      console.debug("PortfolioPage: projects array is empty, data cleared from localStorage.");
+    } else if (isLoaded && isSignedIn && loadedDecryptionKey && projects.length === 0) {
+        // If projects array is explicitly empty and everything else is ready, clear localStorage
+        localStorage.removeItem("portfolioProjects");
+        console.debug("PortfolioPage: projects array is empty, data cleared from localStorage.");
     }
     console.debug("PortfolioPage: useEffect exit (projects data change)");
-  }, [projects, decryptionKey, isLoaded, isSignedIn]);
+  }, [projects, loadedDecryptionKey, isLoaded, isSignedIn]);
 
   const handleSubmitProject = (projectData: any) => {
     console.debug("PortfolioPage: handleSubmitProject entry", { projectData, currentProject });
@@ -161,7 +174,7 @@ export default function PortfolioPage() {
 
   const handleExportJson = () => {
     console.debug("PortfolioPage: handleExportJson entry");
-    if (!decryptionKey || !isSignedIn) {
+    if (!loadedDecryptionKey || !isSignedIn) {
       alert("로그인해야 데이터를 내보낼 수 있습니다.");
       console.warn("handleExportJson: Not signed in or key not available, cannot export.");
       return;
@@ -196,14 +209,14 @@ export default function PortfolioPage() {
           </p>
         </div>
         <div className="flex space-x-2">
-          <Button onClick={handleExportJson} variant="outline" disabled={!isSignedIn || !decryptionKey || projects.length === 0}>
+          <Button onClick={handleExportJson} variant="outline" disabled={!isSignedIn || !loadedDecryptionKey || projects.length === 0}>
             JSON 내보내기
           </Button>
           <Button onClick={() => {
             console.debug("PortfolioPage: Add project button clicked");
             setIsModalOpen(true);
             setCurrentProject(null); // Ensure no old data in form
-          }} disabled={!isSignedIn || !decryptionKey}>
+          }} disabled={!isSignedIn || !loadedDecryptionKey}>
             <Plus className="mr-2 h-4 w-4" />
             프로젝트 추가
           </Button>
@@ -222,8 +235,12 @@ export default function PortfolioPage() {
             <p className="text-muted-foreground text-center">인증 정보를 불러오는 중...</p>
           ) : !isSignedIn ? (
             <p className="text-muted-foreground text-center">로그인해야 데이터를 관리할 수 있습니다.</p>
-          ) : !decryptionKey ? (
-            <p className="text-muted-foreground text-center">복호화 키를 불러오는 중입니다. 잠시만 기다려 주세요.</p>
+          ) : !loadedDecryptionKey ? (
+            keyLoadingError ? (
+              <p className="text-destructive text-center">오류: {keyLoadingError}</p>
+            ) : (
+              <p className="text-muted-foreground text-center">복호화 키를 불러오는 중입니다. 잠시만 기다려 주세요.</p>
+            )
           ) : projects.length === 0 ? (
             <p className="text-muted-foreground text-center">아직 프로젝트가 없습니다. 새로운 프로젝트를 추가해보세요.</p>
           ) : (
@@ -235,8 +252,12 @@ export default function PortfolioPage() {
             <p className="text-muted-foreground text-center">인증 정보를 불러오는 중...</p>
           ) : !isSignedIn ? (
             <p className="text-muted-foreground text-center">로그인해야 데이터를 관리할 수 있습니다.</p>
-          ) : !decryptionKey ? (
-            <p className="text-muted-foreground text-center">복호화 키를 불러오는 중입니다. 잠시만 기다려 주세요.</p>
+          ) : !loadedDecryptionKey ? (
+            keyLoadingError ? (
+              <p className="text-destructive text-center">오류: {keyLoadingError}</p>
+            ) : (
+              <p className="text-muted-foreground text-center">복호화 키를 불러오는 중입니다. 잠시만 기다려 주세요.</p>
+            )
           ) : projects.length === 0 ? (
             <p className="text-muted-foreground text-center">아직 프로젝트가 없습니다. 새로운 프로젝트를 추가해보세요.</p>
           ) : (

@@ -1,6 +1,6 @@
 "use client"
 
-import { Bell, User } from "lucide-react"
+import { Bell } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
+import { UserButton } from "@clerk/nextjs"
 
 export function TopBar() {
   const currentDate = new Date().toLocaleDateString("ko-KR", {
@@ -56,21 +57,7 @@ export function TopBar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <User className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>내 계정</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>프로필</DropdownMenuItem>
-            <DropdownMenuItem>설정</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>로그아웃</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <UserButton afterSignOutUrl="/" />
       </div>
     </header>
   )

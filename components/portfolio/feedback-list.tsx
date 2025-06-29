@@ -33,37 +33,44 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentFeedback, setCurrentFeedback] = useState<Feedback | null>(null);
   const [companies, setCompanies] = useState<string[]>([]); // State for company names
-  const [decryptionKey, setDecryptionKey] = useState<string | null>(null);
+  const [loadedDecryptionKey, setLoadedDecryptionKey] = useState<string | null>(null);
+  const [keyLoadingError, setKeyLoadingError] = useState<string | null>(null);
 
   // 복호화 키를 가져오는 함수
-  const fetchDecryptionKey = async () => {
-    console.debug("fetchDecryptionKey: function entry (FeedbackList)");
+  const loadKey = async () => {
+    console.debug("loadKey: function entry (FeedbackList)");
     if (!isSignedIn) {
-      console.warn("fetchDecryptionKey: Not signed in, cannot fetch key (FeedbackList).");
-      setDecryptionKey(null);
+      console.warn("loadKey: Not signed in, cannot load key (FeedbackList).");
+      setLoadedDecryptionKey(null);
+      setKeyLoadingError("로그인해야 복호화 키를 가져올 수 있습니다.");
       return;
     }
+    setKeyLoadingError(null); // Clear previous errors
     try {
-      const res = await fetch("/api/getKey");
+      const res = await fetch("/api/getDecryptionKey");
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(`키를 가져올 수 없습니다: ${errorData.error || res.statusText}`);
+        // 에러일 땐 text() 로 읽어서 메시지로 던집니다
+        const text = await res.text();
+        throw new Error(text || `Error ${res.status}`);
       }
-      const data = await res.json();
-      setDecryptionKey(data.key);
-      console.debug("fetchDecryptionKey: Key fetched successfully (FeedbackList).");
-    } catch (error) {
-      console.error("fetchDecryptionKey: Error fetching decryption key (FeedbackList)", { error });
-      setDecryptionKey(null);
+      // 성공일 땐 JSON으로 파싱
+      const { key } = await res.json();
+
+      setLoadedDecryptionKey(key);
+      console.debug("loadKey: Key fetched successfully (FeedbackList).");
+    } catch (error: any) {
+      console.error("loadKey: Error fetching decryption key (FeedbackList)", { error });
+      setLoadedDecryptionKey(null);
+      setKeyLoadingError(`복호화 키를 가져오는 데 실패했습니다: ${error.message}`);
       alert(`복호화 키를 가져오는 데 실패했습니다: ${error.message}`);
     }
-    console.debug("fetchDecryptionKey: function exit (FeedbackList)");
+    console.debug("loadKey: function exit (FeedbackList)");
   };
 
   // 피드백 데이터 로드 및 복호화 함수
   const loadAndDecryptFeedbacks = async () => {
     console.debug("loadAndDecryptFeedbacks: function entry (FeedbackList)");
-    if (!decryptionKey) {
+    if (!loadedDecryptionKey) {
       console.debug("loadAndDecryptFeedbacks: Decryption key not available yet (FeedbackList).");
       return;
     }
@@ -71,7 +78,7 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
     const savedFeedbacks = localStorage.getItem("portfolioFeedbacks");
     if (savedFeedbacks) {
       try {
-        const bytes = CryptoJS.AES.decrypt(savedFeedbacks, decryptionKey);
+        const bytes = CryptoJS.AES.decrypt(savedFeedbacks, loadedDecryptionKey);
         const plaintext = bytes.toString(CryptoJS.enc.Utf8);
         if (plaintext) {
           const parsedFeedbacks = JSON.parse(plaintext);
@@ -86,6 +93,7 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
         console.error("FeedbackList: Error parsing or decrypting saved feedbacks from localStorage", { error });
         localStorage.removeItem("portfolioFeedbacks"); // 잘못된 데이터 삭제
         setFeedbacks([]);
+        alert("저장된 피드백 데이터를 복호화하는 데 실패했습니다. 데이터가 손상되었거나 잘못된 키일 수 있습니다. LocalStorage를 초기화합니다.");
       }
     } else {
       setFeedbacks([]);
@@ -97,7 +105,7 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
   // 회사 데이터 로드 및 복호화 함수 (feedback-list에서 필요)
   const loadAndDecryptCompanies = async () => {
     console.debug("loadAndDecryptCompanies: function entry (FeedbackList)");
-    if (!decryptionKey) {
+    if (!loadedDecryptionKey) {
       console.debug("loadAndDecryptCompanies: Decryption key not available yet (FeedbackList).");
       return;
     }
@@ -105,7 +113,7 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
     const savedCompanyData = localStorage.getItem("companyAnalysisData");
     if (savedCompanyData) {
       try {
-        const bytes = CryptoJS.AES.decrypt(savedCompanyData, decryptionKey);
+        const bytes = CryptoJS.AES.decrypt(savedCompanyData, loadedDecryptionKey);
         const plaintext = bytes.toString(CryptoJS.enc.Utf8);
         if (plaintext) {
           const parsedCompanyData = JSON.parse(plaintext);
@@ -124,6 +132,7 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
       } catch (error) {
         console.error("FeedbackList: Error parsing or decrypting company data from localStorage", { error });
         setCompanies([]);
+        alert("저장된 회사 데이터를 복호화하는 데 실패했습니다. 데이터가 손상되었거나 잘못된 키일 수 있습니다.");
       }
     } else {
       setCompanies([]);
@@ -135,17 +144,18 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
   // 데이터 암호화 및 저장 함수
   const saveAndEncryptFeedbacks = (data: Feedback[]) => {
     console.debug("saveAndEncryptFeedbacks: function entry (FeedbackList)", { data });
-    if (!decryptionKey) {
+    if (!loadedDecryptionKey) {
       console.warn("saveAndEncryptFeedbacks: Decryption key not available, cannot encrypt data (FeedbackList).");
       return;
     }
 
     try {
-      const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(data), decryptionKey).toString();
+      const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(data), loadedDecryptionKey).toString();
       localStorage.setItem("portfolioFeedbacks", encryptedData);
       console.debug("FeedbackList: Feedbacks encrypted and saved to localStorage.");
     } catch (error) {
       console.error("FeedbackList: Error encrypting or saving feedbacks to localStorage (FeedbackList)", { error });
+      alert("피드백 암호화 및 저장에 실패했습니다.");
     }
     console.debug("saveAndEncryptFeedbacks: function exit (FeedbackList)");
   };
@@ -153,42 +163,45 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
   // Clerk 인증 상태가 로드되고 로그인 상태일 때 키를 가져옴
   useEffect(() => {
     console.debug("FeedbackList: useEffect entry (Clerk status check)", { isLoaded, isSignedIn });
-    if (isLoaded && isSignedIn) {
-      fetchDecryptionKey();
-    } else if (isLoaded && !isSignedIn) {
-      // 로그아웃 상태일 때 데이터 초기화
-      setFeedbacks([]);
-      setCurrentFeedback(null);
-      setCompanies([]);
-      setDecryptionKey(null);
-      localStorage.removeItem("portfolioFeedbacks");
-      localStorage.removeItem("companyAnalysisData"); // 회사 데이터도 초기화
-      console.debug("FeedbackList: User not signed in, data cleared.");
+    if (isLoaded) {
+      if (isSignedIn) {
+        loadKey();
+      } else {
+        // 로그아웃 상태일 때 데이터 초기화
+        setFeedbacks([]);
+        setCurrentFeedback(null);
+        setCompanies([]);
+        setLoadedDecryptionKey(null);
+        setKeyLoadingError(null); // Clear error when signed out
+        localStorage.removeItem("portfolioFeedbacks");
+        localStorage.removeItem("companyAnalysisData"); // 회사 데이터도 초기화
+        console.debug("FeedbackList: User not signed in, data cleared.");
+      }
     }
     console.debug("FeedbackList: useEffect exit (Clerk status check)");
   }, [isLoaded, isSignedIn]);
 
   // 복호화 키가 변경되면 피드백 데이터와 회사 데이터를 로드 및 복호화
   useEffect(() => {
-    console.debug("FeedbackList: useEffect entry (decryptionKey change)", { decryptionKey });
-    if (decryptionKey) {
+    console.debug("FeedbackList: useEffect entry (loadedDecryptionKey change)", { loadedDecryptionKey });
+    if (loadedDecryptionKey) {
       loadAndDecryptFeedbacks();
       loadAndDecryptCompanies();
     }
-    console.debug("FeedbackList: useEffect exit (decryptionKey change)");
-  }, [decryptionKey]);
+    console.debug("FeedbackList: useEffect exit (loadedDecryptionKey change)");
+  }, [loadedDecryptionKey]);
 
   // feedbacks 데이터가 변경될 때마다 localStorage에 암호화하여 저장
   useEffect(() => {
     console.debug("FeedbackList: useEffect entry (feedbacks data change)", { feedbacks });
-    if (feedbacks.length > 0) {
+    if (feedbacks.length > 0 && loadedDecryptionKey && isLoaded && isSignedIn) {
       saveAndEncryptFeedbacks(feedbacks);
-    } else if (isLoaded && isSignedIn && decryptionKey) { // feedbacks가 비어있고, 로그인 및 키가 있을 때만 localStorage에서도 제거
+    } else if (isLoaded && isSignedIn && loadedDecryptionKey && feedbacks.length === 0) { // feedbacks가 비어있고, 로그인 및 키가 있을 때만 localStorage에서도 제거
         localStorage.removeItem("portfolioFeedbacks");
         console.debug("FeedbackList: feedbacks array is empty, data cleared from localStorage.");
     }
     console.debug("FeedbackList: useEffect exit (feedbacks data change)");
-  }, [feedbacks, decryptionKey, isLoaded, isSignedIn]);
+  }, [feedbacks, loadedDecryptionKey, isLoaded, isSignedIn]);
 
   const handleAddOrUpdateFeedback = (feedbackData: Omit<Feedback, 'id'>) => {
     console.debug("FeedbackList: handleAddOrUpdateFeedback entry", { feedbackData, currentFeedback });
@@ -236,7 +249,7 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
         console.debug("FeedbackList: Add feedback button clicked");
         setIsModalOpen(true);
         setCurrentFeedback(null); // Ensure no old data in form
-      }} disabled={!isSignedIn || !decryptionKey}>
+      }} disabled={!isSignedIn || !loadedDecryptionKey}>
         <Plus className="mr-2 h-4 w-4" />
         피드백 추가
       </Button>
@@ -246,8 +259,12 @@ export function FeedbackList({ /* feedback */ }: FeedbackListProps) {
           <p className="text-muted-foreground text-center">인증 정보를 불러오는 중...</p>
         ) : !isSignedIn ? (
           <p className="text-muted-foreground text-center">로그인해야 데이터를 관리할 수 있습니다.</p>
-        ) : !decryptionKey ? (
-          <p className="text-muted-foreground text-center">복호화 키를 불러오는 중입니다. 잠시만 기다려 주세요.</p>
+        ) : !loadedDecryptionKey ? (
+          keyLoadingError ? (
+            <p className="text-destructive text-center">오류: {keyLoadingError}</p>
+          ) : (
+            <p className="text-muted-foreground text-center">복호화 키를 불러오는 중입니다. 잠시만 기다려 주세요.</p>
+          )
         ) : feedbacks.length === 0 ? (
           <p className="text-muted-foreground">아직 피드백이 없습니다. 새로운 피드백을 추가해보세요.</p>
         ) : (

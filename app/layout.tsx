@@ -7,6 +7,7 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { TopBar } from "@/components/layout/top-bar"
 import { Toaster } from "@/components/ui/toaster"
 import { ClerkProvider } from "@clerk/nextjs";
+import { headers } from "next/headers";
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -16,14 +17,17 @@ export const metadata: Metadata = {
     generator: 'v0.dev'
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
   params: { locale }
 }: {
   children: React.ReactNode,
   params: { locale: string }
 }) {
-  console.debug("RootLayout: function entry", { locale });
+  // headers() 를 곧바로 순회하지 말고,
+  // 필요한 헤더 키만 꺼내 쓰거나 완전히 없애 버리세요.
+  // console.debug("RootLayout headers:", await headers().get("cookie"));
+  // console.debug("RootLayout: function entry", { locale, hdrs_keys: Array.from(hdrs.keys()) });
   return (
     <ClerkProvider>
       <html lang={locale}>

@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic";
+
 import React, { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,35 +19,39 @@ export default function CompaniesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedItem, setSelectedItem] = useState<any | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [decryptionKey, setDecryptionKey] = useState<string | null>(null);
+  const [loadedDecryptionKey, setLoadedDecryptionKey] = useState<string | null>(null);
+  const [keyLoadingError, setKeyLoadingError] = useState<string | null>(null);
 
-  const fetchDecryptionKey = async () => {
-    console.debug("fetchDecryptionKey: function entry");
+  const loadKey = async () => {
+    console.debug("loadKey: function entry");
     if (!isSignedIn) {
-      console.warn("fetchDecryptionKey: Not signed in, cannot fetch key.");
-      setDecryptionKey(null);
+      console.warn("loadKey: Not signed in, cannot load key.");
+      setLoadedDecryptionKey(null);
+      setKeyLoadingError("로그인해야 복호화 키를 가져올 수 있습니다.");
       return;
     }
+    setKeyLoadingError(null); // Clear previous errors
     try {
-      const res = await fetch("/api/getKey");
+      const res = await fetch("/api/getDecryptionKey");
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(`키를 가져올 수 없습니다: ${errorData.error || res.statusText}`);
+        const text = await res.text();
+        throw new Error(text || `Error ${res.status}`);
       }
-      const data = await res.json();
-      setDecryptionKey(data.key);
-      console.debug("fetchDecryptionKey: Key fetched successfully.");
-    } catch (error) {
-      console.error("fetchDecryptionKey: Error fetching decryption key", { error });
-      setDecryptionKey(null);
+      const { key } = await res.json();
+      setLoadedDecryptionKey(key);
+      console.debug("loadKey: Key fetched successfully.");
+    } catch (error: any) {
+      console.error("loadKey: Error fetching decryption key", { error });
+      setLoadedDecryptionKey(null);
+      setKeyLoadingError(`복호화 키를 가져오는 데 실패했습니다: ${error.message}`);
       alert(`복호화 키를 가져오는 데 실패했습니다: ${error.message}`);
     }
-    console.debug("fetchDecryptionKey: function exit");
+    console.debug("loadKey: function exit");
   };
 
   const loadAndDecryptData = async () => {
     console.debug("loadAndDecryptData: function entry");
-    if (!decryptionKey) {
+    if (!loadedDecryptionKey) {
       console.debug("loadAndDecryptData: Decryption key not available yet.");
       return;
     }
@@ -53,7 +59,7 @@ export default function CompaniesPage() {
     const savedData = localStorage.getItem("companyAnalysisData");
     if (savedData) {
       try {
-        const bytes = CryptoJS.AES.decrypt(savedData, decryptionKey);
+        const bytes = CryptoJS.AES.decrypt(savedData, loadedDecryptionKey);
         const plaintext = bytes.toString(CryptoJS.enc.Utf8);
         if (plaintext) {
           const parsedData = JSON.parse(plaintext);
@@ -68,6 +74,7 @@ export default function CompaniesPage() {
         console.error("CompaniesPage: Error parsing or decrypting saved data from localStorage", { error });
         localStorage.removeItem("companyAnalysisData");
         setJsonData(null);
+        alert("저장된 데이터를 복호화하는 데 실패했습니다. 데이터가 손상되었거나 잘못된 키일 수 있습니다. LocalStorage를 초기화합니다.");
       }
     } else {
       setJsonData(null);
@@ -78,52 +85,58 @@ export default function CompaniesPage() {
 
   const saveAndEncryptData = (data: any) => {
     console.debug("saveAndEncryptData: function entry", { data });
-    if (!decryptionKey) {
+    if (!loadedDecryptionKey) {
       console.warn("saveAndEncryptData: Decryption key not available, cannot encrypt data.");
       return;
     }
 
     try {
-      const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(data), decryptionKey).toString();
+      const encryptedData = CryptoJS.AES.encrypt(JSON.stringify(data), loadedDecryptionKey).toString();
       localStorage.setItem("companyAnalysisData", encryptedData);
       console.debug("CompaniesPage: Data encrypted and saved to localStorage.");
     } catch (error) {
       console.error("CompaniesPage: Error encrypting or saving data to localStorage", { error });
+      alert("데이터 암호화 및 저장에 실패했습니다.");
     }
     console.debug("saveAndEncryptData: function exit");
   };
 
   useEffect(() => {
     console.debug("CompaniesPage: useEffect entry (Clerk status check)", { isLoaded, isSignedIn });
-    if (isLoaded && isSignedIn) {
-      fetchDecryptionKey();
-    } else if (isLoaded && !isSignedIn) {
-      setJsonData(null);
-      setDecryptionKey(null);
-      localStorage.removeItem("companyAnalysisData");
-      console.debug("CompaniesPage: User not signed in, data cleared.");
+    if (isLoaded) {
+      if (isSignedIn) {
+        loadKey();
+      } else {
+        setJsonData(null);
+        setLoadedDecryptionKey(null);
+        setKeyLoadingError(null); // Clear error when signed out
+        localStorage.removeItem("companyAnalysisData");
+        console.debug("CompaniesPage: User not signed in, data cleared.");
+      }
     }
     console.debug("CompaniesPage: useEffect exit (Clerk status check)");
   }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
-    console.debug("CompaniesPage: useEffect entry (decryptionKey change)", { decryptionKey });
-    if (decryptionKey) {
+    console.debug("CompaniesPage: useEffect entry (loadedDecryptionKey change)", { loadedDecryptionKey });
+    if (loadedDecryptionKey) {
       loadAndDecryptData();
     }
-    console.debug("CompaniesPage: useEffect exit (decryptionKey change)");
-  }, [decryptionKey]);
+    console.debug("CompaniesPage: useEffect exit (loadedDecryptionKey change)");
+  }, [loadedDecryptionKey]);
 
   useEffect(() => {
     console.debug("CompaniesPage: useEffect entry (jsonData change)", { jsonData });
-    if (jsonData) {
+    // Save data only if jsonData is not null AND decryptionKey is loaded AND user is signed in
+    if (jsonData && loadedDecryptionKey && isLoaded && isSignedIn) {
       saveAndEncryptData(jsonData);
-    } else if (isLoaded && isSignedIn && decryptionKey) {
+    } else if (isLoaded && isSignedIn && loadedDecryptionKey && !jsonData) {
+        // If jsonData is explicitly null and everything else is ready, clear localStorage
         localStorage.removeItem("companyAnalysisData");
         console.debug("CompaniesPage: jsonData is null, data cleared from localStorage.");
     }
     console.debug("CompaniesPage: useEffect exit (jsonData change)");
-  }, [jsonData, decryptionKey, isLoaded, isSignedIn]);
+  }, [jsonData, loadedDecryptionKey, isLoaded, isSignedIn]);
 
   const handleFileUpload = (event: ChangeEvent<HTMLInputElement>) => {
     console.debug("handleFileUpload: function entry");
@@ -171,7 +184,7 @@ export default function CompaniesPage() {
           onChange={handleFileUpload}
           ref={fileInputRef}
           className="max-w-xs"
-          disabled={!isSignedIn || !decryptionKey}
+          disabled={!isSignedIn || !loadedDecryptionKey}
         />
         <Button onClick={() => {
             console.debug("Clear data button clicked");
@@ -183,7 +196,7 @@ export default function CompaniesPage() {
             }
             localStorage.removeItem("companyAnalysisData");
             console.debug("jsonData cleared");
-        }} disabled={!isSignedIn || !decryptionKey}>
+        }} disabled={!isSignedIn || !loadedDecryptionKey}>
           데이터 초기화
         </Button>
       </div>
@@ -192,8 +205,12 @@ export default function CompaniesPage() {
         <p className="text-muted-foreground mt-4 text-center">인증 정보를 불러오는 중...</p>
       ) : !isSignedIn ? (
         <p className="text-muted-foreground mt-4 text-center">로그인해야 데이터를 관리할 수 있습니다.</p>
-      ) : !decryptionKey ? (
-        <p className="text-muted-foreground mt-4 text-center">복호화 키를 불러오는 중입니다. 잠시만 기다려 주세요.</p>
+      ) : !loadedDecryptionKey ? (
+        keyLoadingError ? (
+          <p className="text-destructive mt-4 text-center">오류: {keyLoadingError}</p>
+        ) : (
+          <p className="text-muted-foreground mt-4 text-center">복호화 키를 불러오는 중입니다. 잠시만 기다려 주세요.</p>
+        )
       ) : jsonData ? (
         <div className="space-y-10">
           {companiesToDisplay.length > 0 ? (
