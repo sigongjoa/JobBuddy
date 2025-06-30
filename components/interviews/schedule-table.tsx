@@ -23,6 +23,9 @@ import { Interview } from "@/lib/types"
 
 interface ScheduleTableProps {
   interviews: Interview[];
+  onEdit: (interview: Interview) => void;
+  onDelete: (interviewId: number) => void;
+  onDuplicate: (interview: Interview) => void;
 }
 
 const getStatusColor = (status: string) => {
@@ -38,7 +41,7 @@ const getStatusColor = (status: string) => {
   }
 }
 
-export function ScheduleTable({ interviews }: ScheduleTableProps) {
+export function ScheduleTable({ interviews, onEdit, onDelete, onDuplicate }: ScheduleTableProps) {
   return (
     <div className="rounded-md border">
       <Table>
@@ -93,9 +96,18 @@ export function ScheduleTable({ interviews }: ScheduleTableProps) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>수정</DropdownMenuItem>
-                    <DropdownMenuItem>복제</DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600">삭제</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      console.debug("ScheduleTable: Edit button clicked", { interviewId: interview.id });
+                      onEdit(interview);
+                    }}>수정</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => {
+                      console.debug("ScheduleTable: Duplicate button clicked", { interviewId: interview.id });
+                      onDuplicate(interview);
+                    }}>복제</DropdownMenuItem>
+                    <DropdownMenuItem className="text-red-600" onClick={() => {
+                      console.debug("ScheduleTable: Delete button clicked", { interviewId: interview.id });
+                      onDelete(interview.id);
+                    }}>삭제</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

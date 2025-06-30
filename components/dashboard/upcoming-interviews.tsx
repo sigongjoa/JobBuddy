@@ -1,8 +1,19 @@
 import { Calendar, Clock, MapPin } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { useEffect, useState } from "react"
 
-const upcomingInterviews = [
+interface Interview {
+  id: number;
+  company: string;
+  role: string;
+  date: string;
+  time: string;
+  type: string;
+  location: string;
+}
+
+const defaultUpcomingInterviews: Interview[] = [
   {
     id: 1,
     company: "TechCorp",
@@ -33,6 +44,28 @@ const upcomingInterviews = [
 ]
 
 export function UpcomingInterviews() {
+  console.debug("UpcomingInterviews: function entry");
+  const [upcomingInterviews, setUpcomingInterviews] = useState<Interview[]>([]);
+
+  useEffect(() => {
+    console.debug("UpcomingInterviews: useEffect entry");
+    try {
+      const storedInterviews = localStorage.getItem("upcomingInterviews");
+      if (storedInterviews) {
+        console.debug("UpcomingInterviews: Loading interviews from localStorage.");
+        setUpcomingInterviews(JSON.parse(storedInterviews));
+      } else {
+        console.debug("UpcomingInterviews: No interviews found in localStorage, initializing with empty array.");
+        setUpcomingInterviews([]);
+      }
+    } catch (error) {
+      console.error("UpcomingInterviews: Error loading interviews from localStorage", error);
+      // Fallback to empty interviews if localStorage operations fail
+      setUpcomingInterviews([]);
+    }
+    console.debug("UpcomingInterviews: useEffect exit");
+  }, []);
+
   return (
     <Card>
       <CardHeader>

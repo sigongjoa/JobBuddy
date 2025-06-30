@@ -1,6 +1,6 @@
 "use client"
 
-import { Calendar, Building2, FolderOpen, Home, Settings } from "lucide-react"
+import { Calendar, Building2, FolderOpen, Home, Settings, Activity } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
@@ -39,8 +39,18 @@ const navigationItems = [
     icon: FolderOpen,
   },
   {
+    title: "AI 리서치",
+    url: "/crewai",
+    icon: Activity,
+  },
+  {
     title: "설정",
     url: "/settings",
+    icon: Settings,
+  },
+  {
+    title: "구독 관리",
+    url: "/settings/subscription",
     icon: Settings,
   },
 ]

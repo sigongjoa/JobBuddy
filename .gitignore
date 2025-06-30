@@ -25,3 +25,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# virtual environment
+/venv/
+/env/
+/python-api/my_crewai_env/

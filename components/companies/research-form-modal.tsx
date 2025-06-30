@@ -16,11 +16,40 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Plus, Edit, Eye, Activity } from "lucide-react"
 
 interface ResearchFormModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
+
+// Helper function to add a new activity to localStorage
+const addRecentActivity = (action: string, target: string, iconName: string) => {
+  console.debug("addRecentActivity: function entry");
+  try {
+    const storedActivities = localStorage.getItem("recentActivities");
+    let activities = storedActivities ? JSON.parse(storedActivities) : [];
+
+    const newActivity = {
+      id: Date.now(), // Unique ID for the activity
+      action: action,
+      target: target,
+      time: "방금 전", // Or calculate relative time later
+      icon: iconName, // Use the string name directly
+    };
+
+    activities.unshift(newActivity); // Add to the beginning of the array
+    localStorage.setItem("recentActivities", JSON.stringify(activities));
+    console.debug("addRecentActivity: New activity added to localStorage.", newActivity);
+
+    // Dispatch a custom event to notify other components about the change
+    window.dispatchEvent(new Event('localStorageChange'));
+    console.debug("addRecentActivity: Dispatched 'localStorageChange' event.");
+  } catch (error) {
+    console.error("addRecentActivity: Error adding activity to localStorage", error);
+  }
+  console.debug("addRecentActivity: function exit");
+};
 
 const skillOptions = [
   "React",
@@ -77,9 +106,17 @@ export function ResearchFormModal({ open, onOpenChange }: ResearchFormModalProps
   }
 
   const handleSubmit = (e: React.FormEvent) => {
+    console.debug("ResearchFormModal: handleSubmit entry");
     e.preventDefault()
     console.log("Form submitted:", formData)
+
+    // Add activity to recent activities in localStorage
+    if (formData.name) {
+      addRecentActivity("새 회사 추가", formData.name, "Plus"); // Pass "Plus" as string for the icon
+    }
+
     onOpenChange(false)
+    console.debug("ResearchFormModal: handleSubmit exit");
   }
 
   return (

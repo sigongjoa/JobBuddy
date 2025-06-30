@@ -1,0 +1,29 @@
+{
+  "objective": "여기에 전체 크루의 목표를 입력하세요",
+  "context": "여기에 크루가 사용할 추가 컨텍스트를 입력하세요",
+  "max_iterations": 3,
+  "async_execution": true,
+  "tasks": [
+    {
+      "id": 1,
+      "description": "여기에 태스크 설명을 입력하세요. 예: '{objective}에 대한 심층 연구 수행', 여기서 {objective}는 CrewRequest의 objective로 채워집니다.",
+      "expected_output": "여기에 태스크의 예상 출력 형식을 입력하세요.",
+      "agents": [
+        {
+          "role": "Researcher",
+          "goal": "특정 주제에 대한 심층 정보 검색 및 분석",
+          "backstory": "정보 검색 및 분석에 탁월한 숙련된 연구원입니다.",
+          "allow_delegation": false,
+          "instruction": "관련 데이터를 꼼꼼히 조사하고 종합하여 실행 가능한 통찰력을 제공합니다."
+        },
+        {
+          "role": "Writer",
+          "goal": "매력적이고 간결한 콘텐츠 작성",
+          "backstory": "매력적인 콘텐츠를 작성하는 데 능숙한 창의적인 작가입니다.",
+          "allow_delegation": true,
+          "instruction": "복잡한 아이디어를 명확하고 이해하기 쉬운 텍스트로 변환합니다."
+        }
+      ]
+    }
+  ]
+} 

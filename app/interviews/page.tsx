@@ -149,6 +149,40 @@ export default function InterviewsPage() {
     console.debug("InterviewsPage: addInterview exit");
   };
 
+  const updateInterview = (updatedInterview: Interview) => {
+    console.debug("InterviewsPage: updateInterview entry", { updatedInterview });
+    setInterviews((prevInterviews) => {
+      const updatedList = prevInterviews.map(interview =>
+        interview.id === updatedInterview.id ? updatedInterview : interview
+      );
+      console.debug("InterviewsPage: Interview updated", { updatedInterview, updatedList });
+      return updatedList;
+    });
+    console.debug("InterviewsPage: updateInterview exit");
+  };
+
+  const deleteInterview = (interviewId: number) => {
+    console.debug("InterviewsPage: deleteInterview entry", { interviewId });
+    setInterviews((prevInterviews) => {
+      const filteredList = prevInterviews.filter(interview => interview.id !== interviewId);
+      console.debug("InterviewsPage: Interview deleted", { interviewId, filteredList });
+      return filteredList;
+    });
+    console.debug("InterviewsPage: deleteInterview exit");
+  };
+
+  const duplicateInterview = (interviewToDuplicate: Interview) => {
+    console.debug("InterviewsPage: duplicateInterview entry", { interviewToDuplicate });
+    setInterviews((prevInterviews) => {
+      const newId = prevInterviews.length > 0 ? Math.max(...prevInterviews.map(i => i.id)) + 1 : 1;
+      const duplicated = { ...interviewToDuplicate, id: newId };
+      const updatedList = [...prevInterviews, duplicated];
+      console.debug("InterviewsPage: Interview duplicated", { duplicated, updatedList });
+      return updatedList;
+    });
+    console.debug("InterviewsPage: duplicateInterview exit");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -186,7 +220,12 @@ export default function InterviewsPage() {
           ) : interviews.length === 0 ? (
             <p className="text-muted-foreground text-center">표시할 면접 정보가 없습니다. 새로운 면접을 추가해보세요.</p>
           ) : (
-            <ScheduleTable interviews={interviews} />
+            <ScheduleTable
+              interviews={interviews}
+              onEdit={updateInterview}
+              onDelete={deleteInterview}
+              onDuplicate={duplicateInterview}
+            />
           )}
         </TabsContent>
         <TabsContent value="calendar" className="space-y-4">

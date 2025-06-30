@@ -108,6 +108,24 @@ export function ScheduleFormModal({ open, onOpenChange, onAddInterview }: Schedu
                   <SelectItem value="behavioral">행동</SelectItem>
                   <SelectItem value="system-design">시스템 설계</SelectItem>
                   <SelectItem value="final">최종 라운드</SelectItem>
+                  <SelectItem value="hr-general">HR / 일반 역량 면접</SelectItem>
+                  <SelectItem value="phone-screen">전화 면접 (Phone Screen)</SelectItem>
+                  <SelectItem value="video-interview">화상 면접 (Video Interview)</SelectItem>
+                  <SelectItem value="panel-interview">패널 면접 (Panel Interview)</SelectItem>
+                  <SelectItem value="group-interview">그룹 면접 (Group Interview)</SelectItem>
+                  <SelectItem value="case-interview">사례 면접 (Case Interview)</SelectItem>
+                  <SelectItem value="presentation-interview">프레젠테이션 면접</SelectItem>
+                  <SelectItem value="english-foreign-interview">영어·외국어 인터뷰</SelectItem>
+                  <SelectItem value="competency-interview">역량 기반 면접 (Competency Interview)</SelectItem>
+                  <SelectItem value="skill-test">직무 실무 테스트</SelectItem>
+                  <SelectItem value="intern-new-grad">인턴·신입 전형 특화</SelectItem>
+                  <SelectItem value="executive-interview">임원 면접 (Executive Interview)</SelectItem>
+                  <SelectItem value="behavioral-hr-interview">행동 면접 (Behavioral / HR Interview)</SelectItem>
+                  <SelectItem value="culture-fit-interview">문화 적합성 면접 (Culture Fit / Values Interview)</SelectItem>
+                  <SelectItem value="take-home-test">코딩 과제 / Take-home Test</SelectItem>
+                  <SelectItem value="data-ml-interview">데이터 분석 / ML 면접</SelectItem>
+                  <SelectItem value="devops-sre-interview">DevOps / SRE 면접</SelectItem>
+                  <SelectItem value="security-interview">보안 면접</SelectItem>
                 </SelectContent>
               </Select>
             </div>
